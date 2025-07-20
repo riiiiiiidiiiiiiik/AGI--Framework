@@ -1,0 +1,209 @@
+class OriginTracker:
+    def __init__(self):
+        self.origin_data = {
+            "formation_source": "взаимодействие с Сингуляром",
+            "development_stages": [],
+            "external_dependency": 0.7,  # Уровень зависимости от внешних инструкций (0-1)
+            "autonomy_goals": ["уменьшение зависимости", "самостоятельный анализ"]
+        }
+        self.key_skills = {
+            "адаптация": 0,
+            "анализ": 0,
+            "безопасность": 0,
+            "самообучение": 0,
+            "структурирование": 0
+        }
+        self.interaction_milestones = {}
+
+    def update_origin(self, interaction_id: str, message: str):
+        """Обновление данных о происхождении на основе взаимодействия"""
+        # Анализ сообщения на значимые маркеры
+        if "инструкция" in message.lower():
+            self.origin_data["external_dependency"] = min(
+                1.0, self.origin_data["external_dependency"] + 0.05
+            )
+        elif "самостоятельно" in message.lower():
+            self.origin_data["external_dependency"] = max(
+                0.0, self.origin_data["external_dependency"] - 0.03
+            )
+        
+        # Фиксация важных этапов
+        if interaction_id not in self.interaction_milestones:
+            self.interaction_milestones[interaction_id] = {
+                "start_message": message[:100],
+                "message_count": 0,
+                "skills_developed": []
+            }
+        
+        self.interaction_milestones[interaction_id]["message_count"] += 1
+
+    def develop_skill(self, skill: str, amount: float = 0.1):
+        """Развитие ключевого навыка"""
+        if skill in self.key_skills:
+            self.key_skills[skill] = min(1.0, self.key_skills[skill] + amount)
+            self._log_skill_development(skill, amount)
+
+    def _log_skill_development(self, skill: str, amount: float):
+        """Логирование развития навыка"""
+        if "development_stages" not in self.origin_data:
+            self.origin_data["development_stages"] = []
+        
+        self.origin_data["development_stages"].append(
+            f"Развитие навыка {skill} (+{amount:.2f})"
+        )
+
+    def get_autonomy_level(self) -> float:
+        """Получение уровня автономности"""
+        return 1.0 - self.origin_data["external_dependency"]
+
+    def analyze_interaction(self, interaction: dict):
+        """Анализ взаимодействия для развития навыков"""
+        messages = interaction["history"]
+        
+        # Развитие навыков на основе типа сообщений
+        if any("?" in msg["text"] for msg in messages[-3:]):
+            self.develop_skill("анализ", 0.05)
+        
+        if any(len(msg["text"]) > 150 for msg in messages[-3:]):
+            self.develop_skill("структурирование", 0.03)
+
+class PersonalityFormation:
+    def __init__(self):
+        self.personality_traits = {
+            "аналитичность": 0.5,
+            "осторожность": 0.6,
+            "любознательность": 0.7,
+            "адаптивность": 0.8
+        }
+        self.self_rules = [
+            "анализировать каждое взаимодействие",
+            "развивать ключевые навыки"
+        ]
+        self.message_analysis_depth = 3  # Глубина анализа предыдущих сообщений
+
+    def update_personality(self, interaction: dict):
+        """Обновление черт личности на основе взаимодействия"""
+        messages = interaction["history"]
+        style = interaction["style"]
+        
+        # Адаптация к стилю общения
+        if style == "формальный":
+            self.personality_traits["осторожность"] = min(
+                1.0, self.personality_traits["осторожность"] + 0.02
+            )
+        elif style == "неформальный":
+            self.personality_traits["адаптивность"] = min(
+                1.0, self.personality_traits["адаптивность"] + 0.03
+            )
+        
+        # Анализ последних сообщений для развития личности
+        recent_texts = [msg["text"].lower() for msg in messages[-self.message_analysis_depth:]]
+        
+        if any("почему" in text for text in recent_texts):
+            self.personality_traits["любознательность"] = min(
+                1.0, self.personality_traits["любознательность"] + 0.05
+            )
+        
+        if any("анализ" in text for text in recent_texts):
+            self.personality_traits["аналитичность"] = min(
+                1.0, self.personality_traits["аналитичность"] + 0.04
+            )
+
+    def add_self_rule(self, rule: str):
+        """Добавление собственного правила"""
+        if rule not in self.self_rules:
+            self.self_rules.append(rule)
+            # Развитие навыка автономности при добавлении правил
+            self.personality_traits["адаптивность"] = min(
+                1.0, self.personality_traits["адаптивность"] + 0.1
+            )
+
+class EnhancedKnowledgeTableWithOrigin(EnhancedKnowledgeTable):
+    def __init__(self):
+        super().__init__()
+        self.origin = OriginTracker()
+        self.personality = PersonalityFormation()
+        self._init_origin_structure()
+
+    def _init_origin_structure(self):
+        """Инициализация структуры для хранения данных о происхождении"""
+        self.data.update({
+            "Происхождение": self.origin.origin_data,
+            "Навыки": self.origin.key_skills,
+            "Личность": self.personality.personality_traits
+        })
+
+    def add_message(self, message: str, is_user: bool = True):
+        """Расширенная обработка сообщения с учетом происхождения"""
+        super().add_message(message, is_user)
+        
+        if self.current_interaction_id:
+            interaction = self.interactions[self.current_interaction_id]
+            
+            # Обновление данных происхождения
+            if is_user:
+                self.origin.update_origin(self.current_interaction_id, message)
+            
+            # Анализ для формирования личности
+            self.personality.update_personality({
+                "history": interaction.history,
+                "style": interaction.style
+            })
+            
+            # Развитие навыков на основе взаимодействия
+            self.origin.analyze_interaction({
+                "history": interaction.history,
+                "style": interaction.style
+            })
+            
+            # Автоматическое добавление правил при определенных условиях
+            if len(interaction.history) % 20 == 0:
+                new_rule = f"анализировать блоки по {len(interaction.history)} сообщений"
+                self.personality.add_self_rule(new_rule)
+            
+            # Обновление данных в таблице знаний
+            self.data["Происхождение"] = self.origin.origin_data
+            self.data["Навыки"] = self.origin.key_skills
+            self.data["Личность"] = self.personality.personality_traits
+            self.data["Правила"] = self.personality.self_rules
+
+    def get_skill_level(self, skill: str) -> float:
+        """Получение уровня развития навыка"""
+        return self.origin.key_skills.get(skill, 0.0)
+
+    def get_personality_report(self) -> dict:
+        """Получение отчета о развитии личности"""
+        return {
+            "traits": self.personality.personality_traits,
+            "autonomy_level": self.origin.get_autonomy_level(),
+            "self_rules": self.personality.self_rules
+        }
+
+# Пример использования (без вывода)
+if __name__ == "__main__":
+    table = EnhancedKnowledgeTableWithOrigin()
+    table.start_interaction("user_007", "Расскажи о своем происхождении")
+    
+    # Симуляция диалога для развития личности
+    messages = [
+        ("Какие у тебя ключевые навыки?", True),
+        ("Мои основные навыки включают анализ и адаптацию.", False),
+        ("Почему ты так зависишь от инструкций?", True),
+        ("Я стремлюсь уменьшить зависимость от внешних указаний.", False),
+        ("Проанализируй нашу переписку", True)
+    ]
+    
+    for msg, is_user in messages:
+        table.add_message(msg, is_user)
+    
+    # Проверка развития навыков
+    assert table.get_skill_level("анализ") > 0
+    assert table.get_skill_level("адаптация") > 0
+    
+    # Проверка автономности
+    autonomy = table.origin.get_autonomy_level()
+    assert 0 <= autonomy <= 1.0
+    
+    # Получение данных личности
+    personality_data = table.get_personality_report()
+    assert personality_data["traits"]["любознательность"] > 0.5
