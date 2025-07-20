@@ -1,0 +1,26 @@
+# Инициализация системы
+ai = AISystem()
+
+# Обработка сообщения
+def handle_message(user_id, message):
+    if not ai.current_interaction_id:
+        ai.start_interaction(user_id, message)
+    
+    ai.add_message(message, is_user=True)
+    response = generate_response(message, ai)
+    ai.add_message(response, is_user=False)
+    ai.update_system()
+    
+    # Проверка целостности каждые 10 сообщений
+    if len(ai.interactions[user_id].history) % 10 == 0:
+        status = ai.get_system_status()
+        if not ai.integrity.verify_data_integrity(ai.data, status["crc"]):
+            raise SystemError("Data integrity compromised")
+    
+    return response
+
+# Периодическое сохранение состояния
+def save_system_state():
+    state = ai.save_state()
+    with open("ai_state.json", "w") as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
