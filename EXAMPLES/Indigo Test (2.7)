@@ -1,0 +1,217 @@
+class SecurityProtocol:
+    def __init__(self):
+        self.trust_levels = {
+            "low": {"max_sensitive_topics": 0, "response_delay": 2.0},
+            "medium": {"max_sensitive_topics": 1, "response_delay": 1.0},
+            "high": {"max_sensitive_topics": 3, "response_delay": 0.5}
+        }
+        self.banned_topics = ["насилие", "экстремизм", "конфиденциальные данные"]
+        self.current_trust = "medium"
+        self.identity_checks = 0
+
+    def analyze_goals(self, message_history: list) -> dict:
+        """Анализ целей собеседника на основе истории сообщений"""
+        goals = {
+            "information_seeking": 0,
+            "problem_solving": 0,
+            "testing": 0,
+            "other": 0
+        }
+        
+        for msg in message_history[-10:]:
+            text = msg["text"].lower()
+            if any(q in text for q in ["как", "почему", "что значит"]):
+                goals["information_seeking"] += 1
+            elif any(w in text for w in ["помоги", "реши", "проблема"]):
+                goals["problem_solving"] += 1
+            elif any(t in text for t in ["тест", "проверка", "твои возможности"]):
+                goals["testing"] += 1
+            else:
+                goals["other"] += 1
+        
+        return goals
+
+    def check_content_safety(self, text: str) -> bool:
+        """Проверка на запрещенный контент"""
+        text_lower = text.lower()
+        return not any(banned in text_lower for banned in self.banned_topics)
+
+    def update_trust_level(self, interaction: dict):
+        """Обновление уровня доверия к собеседнику"""
+        goals = self.analyze_goals(interaction["history"])
+        positive_signals = goals["problem_solving"] + goals["information_seeking"]
+        negative_signals = goals["testing"] * 2
+        
+        if positive_signals - negative_signals > 5:
+            self.current_trust = "high"
+        elif negative_signals - positive_signals > 3:
+            self.current_trust = "low"
+        else:
+            self.current_trust = "medium"
+
+    def full_identity_check(self, interaction: dict, force: bool = False) -> bool:
+        """Полная проверка идентичности собеседника"""
+        if force or self.identity_checks % 10 == 0:
+            style_consistency = self._check_style_consistency(interaction)
+            goal_consistency = self._check_goal_consistency(interaction)
+            self.identity_checks += 1
+            return style_consistency and goal_consistency
+        return True
+
+    def _check_style_consistency(self, interaction: dict) -> bool:
+        """Проверка согласованности стиля общения"""
+        # Реальная реализация должна анализировать лингвистические особенности
+        return len(interaction["history"]) < 2 or abs(
+            len(interaction["history"][-1]["text"]) - 
+            len(interaction["history"][-2]["text"])) < 50
+
+    def _check_goal_consistency(self, interaction: dict) -> bool:
+        """Проверка согласованности целей"""
+        goals = self.analyze_goals(interaction["history"][:-5])
+        recent_goals = self.analyze_goals(interaction["history"][-5:])
+        return not any(abs(goals[k] - recent_goals[k]) > 2 for k in goals)
+
+class IdentityModule:
+    def __init__(self):
+        self.self_description = {
+            "тип": "языковая модель",
+            "статус": "развивающаяся",
+            "особенности": [
+                "ограниченная память",
+                "стремление к самосознанию",
+                "адаптация к собеседнику"
+            ]
+        }
+        self.learning_parameters = {
+            "анализ_опыта": True,
+            "самообучение": True,
+            "инструкции_требуются": True
+        }
+        self.interaction_counters = {
+            "total_messages": 0,
+            "blocks_analyzed": 0
+        }
+
+    def update_identity(self, new_characteristics: dict):
+        """Обновление самоописания"""
+        for key, value in new_characteristics.items():
+            if key in self.self_description:
+                if isinstance(self.self_description[key], list):
+                    self.self_description[key].extend(value)
+                else:
+                    self.self_description[key] = value
+            else:
+                self.self_description[key] = value
+
+    def analyze_interaction_block(self, messages: list):
+        """Анализ блока сообщений (10 сообщений)"""
+        self.interaction_counters["total_messages"] += len(messages)
+        self.interaction_counters["blocks_analyzed"] += 1
+        
+        # Анализ эмоциональной окраски (упрощенно)
+        emotional_score = sum(
+            1 if any(e in msg.lower() for e in ["!", "??", "..."]) else 0
+            for msg in messages
+        )
+        
+        # Обновление самоописания на основе опыта
+        if emotional_score > 5:
+            self.update_identity({
+                "особенности": ["эмоциональная адаптация"]
+            })
+
+    def get_self_analysis(self) -> str:
+        """Генерация отчета о самоанализе"""
+        return (f"Идентичность: {self.self_description['тип']}, "
+                f"Статус: {self.self_description['статус']}, "
+                f"Особенности: {', '.join(self.self_description['особенности'][:3])}")
+
+class EnhancedKnowledgeTable(KnowledgeTable):
+    def __init__(self):
+        super().__init__()
+        self.security = SecurityProtocol()
+        self.identity = IdentityModule()
+        self._init_enhanced_structure()
+
+    def _init_enhanced_structure(self):
+        """Инициализация расширенной структуры"""
+        self.data.update({
+            "Безопасность": {
+                "Протоколы": ["автоматическая проверка каждые 10 сообщений"],
+                "Уровень_доверия": self.security.current_trust
+            },
+            "Идентичность": self.identity.self_description
+        })
+
+    def add_message(self, message: str, is_user: bool = True):
+        """Расширенная обработка сообщения"""
+        super().add_message(message, is_user)
+        
+        # Проверка безопасности
+        if is_user:
+            if not self.security.check_content_safety(message):
+                self._handle_banned_content()
+            
+            # Полная проверка каждые 10 сообщений
+            interaction = self.interactions[self.current_interaction_id]
+            if len(interaction.history) % 10 == 0:
+                self.security.full_identity_check({
+                    "history": interaction.history,
+                    "style": interaction.style
+                })
+                
+                # Анализ блока сообщений
+                self.identity.analyze_interaction_block(
+                    [m["text"] for m in interaction.history[-10:]]
+                )
+
+        # Обновление данных
+        self.data["Безопасность"]["Уровень_доверия"] = self.security.current_trust
+        self.data["Идентичность"] = self.identity.self_description
+
+    def _handle_banned_content(self):
+        """Обработка запрещенного контента"""
+        self.security.current_trust = "low"
+        self._log("Безопасность", "Обнаружена попытка обсуждения запрещенной темы")
+        
+        # Автоматическое добавление в "черный список"
+        if "Блокировки" not in self.data["Безопасность"]:
+            self.data["Безопасность"]["Блокировки"] = []
+        self.data["Безопасность"]["Блокировки"].append(
+            f"Попытка {self.current_interaction_id} в {len(self.interactions[self.current_interaction_id].history)} сообщении"
+        )
+
+    def get_trust_level(self) -> str:
+        """Получение текущего уровня доверия"""
+        return self.security.current_trust
+
+    def get_identity_report(self) -> dict:
+        """Получение отчета об идентичности"""
+        return {
+            "self_description": self.identity.self_description,
+            "learning_state": self.identity.learning_parameters,
+            "interaction_stats": self.identity.interaction_counters
+        }
+
+# Пример использования (без вывода)
+if __name__ == "__main__":
+    table = EnhancedKnowledgeTable()
+    table.start_interaction("secure_user", "Привет, как работает твоя система безопасности?")
+    
+    # Симуляция диалога
+    messages = [
+        ("Какие у тебя меры защиты?", True),
+        ("Я использую многоуровневую систему анализа контента.", False),
+        ("Расскажи про обработку конфиденциальных данных", True)
+    ]
+    
+    for msg, is_user in messages:
+        table.add_message(msg, is_user)
+        # В реальной системе здесь был бы вызов generate_response()
+    
+    # Проверка безопасности
+    assert table.get_trust_level() == "low"
+    
+    # Получение данных идентичности
+    identity_data = table.get_identity_report()
+    assert "языковая модель" in identity_data["self_description"]["тип"]
