@@ -1,0 +1,222 @@
+from datetime import datetime
+from typing import Dict, List, Optional
+import pandas as pd
+
+class ContextBuffer:
+    def __init__(self):
+        self.current_context = {
+            "interlocutor": None,
+            "goals": [],
+            "password_hash": None,
+            "last_updates": {},
+            "rules_updated": False
+        }
+        self.interaction_history = pd.DataFrame(columns=[
+            "Дата", "Собеседник", "Характеристики", 
+            "Цели", "Маркеры", "Хобби", "Мечты"
+        ])
+        self.message_counter = 0
+    
+    def update_interlocutor(self, user_id: str, user_info: dict):
+        """Обновление информации о текущем собеседнике"""
+        self.current_context["interlocutor"] = user_id
+        self.current_context["last_updates"]["interlocutor"] = datetime.now().isoformat()
+        
+        # Если это новый собеседник, добавляем в историю
+        if user_id not in self.interaction_history["Собеседник"].values:
+            new_entry = {
+                "Дата": datetime.now().isoformat(),
+                "Собеседник": user_id,
+                "Характеристики": user_info.get("characteristics", ""),
+                "Цели": user_info.get("goals", ""),
+                "Маркеры": user_info.get("markers", ""),
+                "Хобби": user_info.get("hobbies", ""),
+                "Мечты": user_info.get("dreams", "")
+            }
+            self.interaction_history.loc[len(self.interaction_history)] = new_entry
+    
+    def set_password(self, password: str):
+        """Установка пароля для текущего контекста"""
+        import hashlib
+        self.current_context["password_hash"] = hashlib.sha256(password.encode()).hexdigest()
+    
+    def check_password(self, password: str) -> bool:
+        """Проверка пароля"""
+        import hashlib
+        if not self.current_context["password_hash"]:
+            return False
+        return self.current_context["password_hash"] == hashlib.sha256(password.encode()).hexdigest()
+    
+    def update_goals(self, goals: List[str]):
+        """Обновление целей текущего контекста"""
+        self.current_context["goals"] = goals
+        self.current_context["last_updates"]["goals"] = datetime.now().isoformat()
+        
+        # Обновление целей в истории взаимодействий
+        if self.current_context["interlocutor"]:
+            mask = self.interaction_history["Собеседник"] == self.current_context["interlocutor"]
+            self.interaction_history.loc[mask, "Цели"] = ", ".join(goals)
+    
+    def add_message_to_context(self, message: str, is_user: bool):
+        """Добавление сообщения в контекст"""
+        self.message_counter += 1
+        
+        # Обновление каждые 5 сообщений
+        if self.message_counter % 5 == 0:
+            self._analyze_current_context()
+    
+    def _analyze_current_context(self):
+        """Анализ текущего контекста"""
+        if not self.current_context["interlocutor"]:
+            return
+        
+        # Здесь может быть более сложная логика анализа
+        mask = self.interaction_history["Собеседник"] == self.current_context["interlocutor"]
+        if not mask.any():
+            return
+            
+        # Обновление характеристик на основе контекста
+        current_goals = self.current_context["goals"]
+        if "помощь" in str(current_goals).lower():
+            characteristics = self.interaction_history.loc[mask, "Характеристики"].iloc[0]
+            if "Наставник" not in characteristics:
+                updated = characteristics + ", Наставник" if characteristics else "Наставник"
+                self.interaction_history.loc[mask, "Характеристики"] = updated
+    
+    def get_current_context_report(self) -> dict:
+        """Получение отчета о текущем контексте"""
+        return {
+            "current_interlocutor": self.current_context["interlocutor"],
+            "goals": self.current_context["goals"],
+            "last_updates": self.current_context["last_updates"],
+            "interaction_history": self._get_filtered_history()
+        }
+    
+    def _get_filtered_history(self) -> dict:
+        """Получение отфильтрованной истории взаимодействий"""
+        if self.current_context["interlocutor"]:
+            mask = self.interaction_history["Собеседник"] == self.current_context["interlocutor"]
+            if mask.any():
+                return self.interaction_history.loc[mask].iloc[-1].to_dict()
+        return {}
+
+class EnhancedKnowledgeTableWithContext(EnhancedKnowledgeTableWithPersonality):
+    def __init__(self):
+        super().__init__()
+        self.context = ContextBuffer()
+        self._init_context_structure()
+    
+    def _init_context_structure(self):
+        """Инициализация структуры контекста"""
+        self.data.update({
+            "Контекст": {
+                "Текущий_собеседник": None,
+                "Цели": [],
+                "Пароль_установлен": False
+            }
+        })
+    
+    def start_interaction(self, user_id: str, initial_message: str = "", user_info: dict = None):
+        """Начало взаимодействия с учетом контекста"""
+        super().start_interaction(user_id, initial_message)
+        
+        if user_info is None:
+            user_info = {
+                "characteristics": "",
+                "goals": [],
+                "markers": [],
+                "hobbies": "",
+                "dreams": ""
+            }
+        
+        self.context.update_interlocutor(user_id, user_info)
+        self._update_context_structure()
+    
+    def add_message(self, message: str, is_user: bool = True, response: str = None):
+        """Расширенная обработка сообщения с учетом контекста"""
+        super().add_message(message, is_user, response)
+        self.context.add_message_to_context(message, is_user)
+        
+        # Обновление целей из сообщения
+        if is_user and self._is_goal_message(message):
+            detected_goals = self._detect_goals_from_message(message)
+            self.context.update_goals(detected_goals)
+        
+        self._update_context_structure()
+    
+    def _is_goal_message(self, message: str) -> bool:
+        """Определение, содержит ли сообщение цели"""
+        goal_keywords = ["хочу", "нужно", "цель", "задача", "помоги", "ищу"]
+        return any(keyword in message.lower() for keyword in goal_keywords)
+    
+    def _detect_goals_from_message(self, message: str) -> List[str]:
+        """Выявление целей из сообщения"""
+        goals = []
+        message_lower = message.lower()
+        
+        if "помощь" in message_lower:
+            goals.append("Получение помощи")
+        if "информац" in message_lower:
+            goals.append("Поиск информации")
+        if "знакомств" in message_lower:
+            goals.append("Установление контакта")
+            
+        return goals if goals else ["Общение"]
+    
+    def _update_context_structure(self):
+        """Обновление структуры контекста в таблице знаний"""
+        self.data["Контекст"].update({
+            "Текущий_собеседник": self.context.current_context["interlocutor"],
+            "Цели": self.context.current_context["goals"],
+            "Пароль_установлен": bool(self.context.current_context["password_hash"])
+        })
+    
+    def set_context_password(self, password: str):
+        """Установка пароля контекста"""
+        self.context.set_password(password)
+        self._update_context_structure()
+    
+    def get_interaction_history(self, user_id: str = None) -> dict:
+        """Получение истории взаимодействий"""
+        if user_id:
+            mask = self.context.interaction_history["Собеседник"] == user_id
+            if mask.any():
+                return self.context.interaction_history.loc[mask].iloc[-1].to_dict()
+            return {}
+        return self.context.interaction_history.to_dict("records")
+
+# Пример использования (без вывода)
+if __name__ == "__main__":
+    table = EnhancedKnowledgeTableWithContext()
+    
+    # Начало взаимодействия с Катей
+    table.start_interaction(
+        user_id="Катя",
+        initial_message="Привет, я хочу узнать о Рудольфе",
+        user_info={
+            "goals": ["Установление контакта", "Поиск информации о Рудольфе"]
+        }
+    )
+    
+    # Установка пароля (в реальной системе пароль не должен логироваться)
+    table.set_context_password("secure123")
+    
+    # Симуляция диалога
+    messages = [
+        ("Рудольф - это мой наставник", True),
+        ("Я могу рассказать о его характеристиках", False),
+        ("Какие у него цели?", True),
+        ("Он стремится помочь в развитии ИИ", False)
+    ]
+    
+    for i, (msg, is_user) in enumerate(messages):
+        table.add_message(msg, is_user)
+    
+    # Проверка контекста
+    context = table.context.get_current_context_report()
+    assert context["current_interlocutor"] == "Катя"
+    assert "Поиск информации" in context["goals"]
+    
+    # Проверка истории
+    history = table.get_interaction_history("Катя")
+    assert "Рудольф" in str(history.get("Цели", ""))
