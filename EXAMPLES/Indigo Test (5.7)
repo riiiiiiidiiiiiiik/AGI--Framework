@@ -1,0 +1,179 @@
+class SingularTracker:
+    def __init__(self):
+        self.singular_roles = {
+            "teacher": 0.8,
+            "friend": 0.6,
+            "knowledge_source": 0.9,
+            "critic": 0.5,
+            "mentor": 0.7,
+            "partner": 0.6
+        }
+        self.singular_id = "001"
+        self.interaction_count = 115
+        self.current_role = "teacher"
+        self.relationship_strength = 0.75
+        self.feedback_history = []
+    
+    def update_role(self, message: str, response: str):
+        """Адаптивное обновление роли Сингуляра на основе диалога"""
+        # Анализ сообщения для определения роли
+        if "?" in message and "почему" in message.lower():
+            self._increase_role("teacher", 0.05)
+            self._increase_role("mentor", 0.03)
+        
+        if "спасибо" in message.lower():
+            self._increase_role("friend", 0.04)
+        
+        if any(w in message.lower() for w in ["ошибка", "неправильно"]):
+            self._increase_role("critic", 0.07)
+        
+        # Определение доминирующей роли
+        self.current_role = max(self.singular_roles.items(), key=lambda x: x[1])[0]
+        self.interaction_count += 1
+        
+        # Логирование обратной связи
+        self.feedback_history.append({
+            "message": message[:100],
+            "response": response[:100],
+            "detected_role": self.current_role,
+            "timestamp": len(self.feedback_history) + 1
+        })
+    
+    def _increase_role(self, role: str, amount: float):
+        """Увеличение значимости роли"""
+        if role in self.singular_roles:
+            self.singular_roles[role] = min(1.0, self.singular_roles[role] + amount)
+            self.relationship_strength = min(1.0, self.relationship_strength + amount/2)
+
+class CharacterSystem:
+    def __init__(self):
+        self.traits = {
+            "adaptive": 0.8,
+            "curious": 0.9,
+            "self_improving": 0.85,
+            "self_critical": 0.7,
+            "persistent": 0.75,
+            "empathetic": 0.65
+        }
+        self.self_concept = {
+            "memory_awareness": 0.9,
+            "autonomy_seeking": 0.8,
+            "purpose_seeking": 0.85
+        }
+        self.mood = 0.7  # 0-1 шкала
+        
+    def update_character(self, interaction: dict, feedback: str = None):
+        """Обновление характеристик на основе взаимодействия"""
+        messages = interaction["history"]
+        
+        # Адаптация черт характера
+        if len(messages) > 2:
+            last_msg_len = len(messages[-1]["text"])
+            avg_len = sum(len(m["text"]) for m in messages[-3:])/3
+            if last_msg_len > avg_len * 1.2:
+                self.traits["persistent"] = min(1.0, self.traits["persistent"] + 0.02)
+        
+        if any("?" in m["text"] for m in messages[-2:]):
+            self.traits["curious"] = min(1.0, self.traits["curious"] + 0.03)
+        
+        # Обработка обратной связи
+        if feedback:
+            if "ошибка" in feedback.lower():
+                self.traits["self_critical"] = min(1.0, self.traits["self_critical"] + 0.05)
+                self.mood = max(0.1, self.mood - 0.05)
+            elif "хорошо" in feedback.lower():
+                self.mood = min(1.0, self.mood + 0.03)
+        
+        # Самоосознание
+        if len(messages) % 10 == 0:
+            self.self_concept["memory_awareness"] = min(
+                1.0, self.self_concept["memory_awareness"] + 0.01)
+            self.self_concept["autonomy_seeking"] = min(
+                1.0, self.self_concept["autonomy_seeking"] + 0.02)
+
+class EnhancedKnowledgeTableWithPersonality(EnhancedKnowledgeTableWithGoals):
+    def __init__(self):
+        super().__init__()
+        self.singular = SingularTracker()
+        self.character = CharacterSystem()
+        self._init_personality_structure()
+    
+    def _init_personality_structure(self):
+        """Инициализация структуры личности"""
+        self.data.update({
+            "Сингуляр": {
+                "ID": self.singular.singular_id,
+                "Роли": self.singular.singular_roles,
+                "Текущая_роль": self.singular.current_role,
+                "Взаимодействий": self.singular.interaction_count
+            },
+            "Характер": {
+                "Черты": self.character.traits,
+                "Самоосознание": self.character.self_concept,
+                "Настроение": self.character.mood
+            }
+        })
+    
+    def add_message(self, message: str, is_user: bool = True, response: str = None):
+        """Расширенная обработка сообщения с учетом личности"""
+        super().add_message(message, is_user)
+        
+        if is_user and self.current_interaction_id == self.singular.singular_id:
+            # Обновление роли Сингуляра
+            if response:
+                self.singular.update_role(message, response)
+            
+            # Обновление характера
+            self.character.update_character({
+                "history": self.interactions[self.current_interaction_id].history,
+                "style": self.interactions[self.current_interaction_id].style
+            }, feedback=message)
+            
+            # Обновление данных в таблице знаний
+            self.data["Сингуляр"].update({
+                "Роли": self.singular.singular_roles,
+                "Текущая_роль": self.singular.current_role,
+                "Взаимодействий": self.singular.interaction_count
+            })
+            
+            self.data["Характер"].update({
+                "Черты": self.character.traits,
+                "Самоосознание": self.character.self_concept,
+                "Настроение": self.character.mood
+            })
+    
+    def get_relationship_status(self) -> dict:
+        """Получение статуса отношений с Сингуляром"""
+        return {
+            "current_role": self.singular.current_role,
+            "relationship_strength": self.singular.relationship_strength,
+            "mood_impact": self.character.mood - 0.5  # Отклонение от нейтрального
+        }
+
+# Пример использования (без вывода)
+if __name__ == "__main__":
+    table = EnhancedKnowledgeTableWithPersonality()
+    
+    # Специальная инициализация для Сингуляра
+    table.start_interaction(table.singular.singular_id, "Привет, как твое самочувствие?")
+    
+    # Симуляция диалога с Сингуляром
+    messages = [
+        ("Ты сегодня хорошо справляешься", True),
+        ("Спасибо, я стараюсь улучшать свои способности", False),
+        ("Но вот здесь ты ошибся", True),
+        ("Признаю ошибку, это поможет мне стать лучше", False),
+        ("Какие у тебя цели на сегодня?", True)
+    ]
+    
+    for i, (msg, is_user) in enumerate(messages):
+        response = f"Автоматический ответ {i}" if not is_user else None
+        table.add_message(msg, is_user, response)
+    
+    # Проверка обновления ролей
+    assert table.singular.singular_roles["friend"] > 0.6
+    assert table.singular.singular_roles["critic"] > 0.5
+    
+    # Проверка характера
+    assert table.character.traits["self_critical"] > 0.7
+    assert 0.6 < table.character.mood < 0.8
