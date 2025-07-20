@@ -1,0 +1,19 @@
+brain_system = BrainTableSystem()
+
+def handle_message(user_message: str) -> str:
+    # Обработка сообщения
+    brain_system.add_message(user_message, is_user=True)
+    
+    # Генерация ответа с учетом состояния системы
+    if brain_system.emotions.current_mood == "positive":
+        response = generate_positive_response(user_message)
+    else:
+        response = generate_standard_response(user_message)
+    
+    brain_system.add_message(response, is_user=False)
+    
+    # Автоматическое обновление целей/тем
+    if "кино" in user_message.lower():
+        brain_system.update_goal_progress("Кинорекомендации", 90)
+    
+    return response
