@@ -1,0 +1,15 @@
+# Инициализация при старте
+knowledge = KnowledgeTable()
+
+# В обработчике сообщений:
+def process_message(user_id: str, message: str):
+    if not knowledge.current_interaction_id:
+        knowledge.start_interaction(user_id, message)
+    
+    knowledge.add_message(message, is_user=True)
+    
+    # Ваша логика обработки...
+    response = generate_response(message, knowledge)
+    
+    knowledge.add_message(response, is_user=False)
+    return response
