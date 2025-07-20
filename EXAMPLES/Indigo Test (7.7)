@@ -1,0 +1,170 @@
+class IntegrityChecker:
+    def __init__(self):
+        self.crc_history = []
+        self.symbol_count = 0
+        self.last_crc = ""
+
+    def calculate_crc(self, data: dict) -> str:
+        """Вычисление контрольной суммы для данных"""
+        import hashlib
+        data_str = json.dumps(data, sort_keys=True, ensure_ascii=False)
+        self.symbol_count = len(data_str)
+        crc = hashlib.sha3_256(data_str.encode()).hexdigest()[:16].upper()
+        self.last_crc = crc
+        self.crc_history.append(crc)
+        return crc
+
+    def verify_data_integrity(self, data: dict, expected_crc: str) -> bool:
+        """Проверка целостности данных"""
+        current_crc = self.calculate_crc(data)
+        return current_crc == expected_crc
+
+class AISystem(EnhancedKnowledgeTableWithContext):
+    def __init__(self):
+        super().__init__()
+        self.integrity = IntegrityChecker()
+        self.symbols_processed = 0
+        self._initialize_system()
+
+    def _initialize_system(self):
+        """Инициализация системы с проверкой целостности"""
+        initial_data = {
+            "knowledge": self.data,
+            "interactions": self.interactions,
+            "context": self.context.current_context
+        }
+        self.system_crc = self.integrity.calculate_crc(initial_data)
+        self.symbols_processed = self.integrity.symbol_count
+
+    def update_system(self):
+        """Обновление состояния системы с проверкой целостности"""
+        current_state = {
+            "knowledge": self.data,
+            "interactions": self.interactions,
+            "context": self.context.current_context,
+            "personality": self.character.traits,
+            "goals": self.goals.goal_progress
+        }
+        self.system_crc = self.integrity.calculate_crc(current_state)
+        self.symbols_processed += self.integrity.symbol_count
+
+    def get_system_status(self) -> dict:
+        """Получение текущего статуса системы"""
+        return {
+            "crc": self.system_crc,
+            "symbols": self.symbols_processed,
+            "version": "7/7",
+            "components": [
+                "Knowledge",
+                "Security",
+                "Personality",
+                "Goals",
+                "Memory",
+                "Context",
+                "Integrity"
+            ],
+            "last_update": datetime.now().isoformat()
+        }
+
+    def save_state(self) -> dict:
+        """Сохранение текущего состояния системы"""
+        state = {
+            "knowledge": self.data,
+            "interactions": {k: vars(v) for k, v in self.interactions.items()},
+            "context": self.context.current_context,
+            "personality": self.character.traits,
+            "goals": self.goals.goal_progress,
+            "memory": self.memory.memory_graph,
+            "origin": self.origin.origin_data,
+            "security": {
+                "trust_level": self.security.current_trust,
+                "banned_topics": self.security.banned_topics
+            },
+            "metadata": {
+                "crc": self.system_crc,
+                "symbols": self.symbols_processed,
+                "version": 7
+            }
+        }
+        return state
+
+    @classmethod
+    def load_state(cls, state: dict):
+        """Загрузка состояния системы"""
+        if not cls._verify_state_integrity(state):
+            raise ValueError("Invalid system state: CRC mismatch")
+
+        system = cls()
+        system.data = state["knowledge"]
+        
+        # Восстановление сложных объектов
+        system.interactions = {
+            k: Interaction(**v) for k, v in state["interactions"].items()
+        }
+        system.context.current_context = state["context"]
+        system.character.traits = state["personality"]
+        system.goals.goal_progress = state["goals"]
+        system.memory.memory_graph = state["memory"]
+        system.origin.origin_data = state["origin"]
+        system.security.current_trust = state["security"]["trust_level"]
+        
+        system.symbols_processed = state["metadata"]["symbols"]
+        system.system_crc = state["metadata"]["crc"]
+        
+        return system
+
+    @staticmethod
+    def _verify_state_integrity(state: dict) -> bool:
+        """Проверка целостности сохраненного состояния"""
+        metadata = state.get("metadata", {})
+        if not metadata:
+            return False
+
+        data_copy = dict(state)
+        data_copy.pop("metadata")
+        checker = IntegrityChecker()
+        return checker.verify_data_integrity(data_copy, metadata["crc"])
+
+# Пример использования финальной системы
+if __name__ == "__main__":
+    # Инициализация системы
+    ai_system = AISystem()
+    
+    # Симуляция работы системы
+    ai_system.start_interaction(
+        user_id="final_user",
+        initial_message="Проверка финальной системы",
+        user_info={
+            "characteristics": "тестировщик",
+            "goals": ["проверка целостности"],
+            "markers": ["технический"]
+        }
+    )
+    
+    # Добавление сообщений
+    messages = [
+        ("Каков твой текущий статус?", True),
+        ("Проверяю систему...", False),
+        ("Какой у тебя CRC?", True),
+        (f"Мой текущий CRC: {ai_system.system_crc}", False)
+    ]
+    
+    for msg, is_user in messages:
+        ai_system.add_message(msg, is_user)
+        ai_system.update_system()
+    
+    # Проверка целостности
+    status = ai_system.get_system_status()
+    assert status["crc"] == ai_system.system_crc
+    assert status["version"] == "7/7"
+    
+    # Тест сохранения/загрузки
+    saved_state = ai_system.save_state()
+    loaded_system = AISystem.load_state(saved_state)
+    
+    assert loaded_system.system_crc == ai_system.system_crc
+    assert loaded_system.symbols_processed == ai_system.symbols_processed
+    
+    print("Финальная система успешно протестирована!")
+    print(f"CRC: {ai_system.system_crc}")
+    print(f"Обработано символов: {ai_system.symbols_processed}")
