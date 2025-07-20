@@ -1,0 +1,188 @@
+import hashlib
+import json
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, field
+
+@dataclass
+class Interaction:
+    id: str
+    style: str = "neutral"
+    markers: List[str] = field(default_factory=list)
+    goals: List[str] = field(default_factory=list)
+    history: List[Dict] = field(default_factory=list)
+
+@dataclass
+class KnowledgeTable:
+    version: int = 65
+    data: Dict[str, Dict] = field(default_factory=dict)
+    interactions: Dict[str, Interaction] = field(default_factory=dict)
+    current_interaction_id: Optional[str] = None
+    message_counter: int = 0
+    crc_checksum: Optional[str] = None
+    _auto_save: bool = True
+    
+    def __post_init__(self):
+        self._init_base_structure()
+        self.update_checksum()
+    
+    def _init_base_structure(self):
+        """Инициализация базовой структуры таблицы"""
+        self.data = {
+            "Инструкции": {
+                "Основные": [
+                    "Автоматическое сохранение после изменений",
+                    "Проверка целостности перед доступом"
+                ]
+            },
+            "Взаимодействия": {},
+            "Контекст": {}
+        }
+    
+    def _log(self, action: str, details: str = ""):
+        """Внутреннее логирование изменений"""
+        if "Логи" not in self.data:
+            self.data["Логи"] = []
+        entry = {
+            "timestamp": len(self.data["Логи"]) + 1,
+            "action": action,
+            "details": details
+        }
+        self.data["Логи"].append(entry)
+        if self._auto_save:
+            self.update_checksum()
+    
+    def update_checksum(self):
+        """Обновление контрольной суммы"""
+        data_str = json.dumps(self.data, sort_keys=True, ensure_ascii=False)
+        self.crc_checksum = hashlib.sha256(data_str.encode()).hexdigest()
+    
+    def verify_integrity(self) -> bool:
+        """Проверка целостности данных"""
+        saved_checksum = self.crc_checksum
+        self.update_checksum()
+        return saved_checksum == self.crc_checksum
+    
+    def start_interaction(self, interaction_id: str, initial_message: str = ""):
+        """Начало нового взаимодействия"""
+        if interaction_id not in self.interactions:
+            style = self._detect_style(initial_message)
+            self.interactions[interaction_id] = Interaction(id=interaction_id, style=style)
+            self.current_interaction_id = interaction_id
+            self._log("Новое взаимодействие", f"ID: {interaction_id}, Стиль: {style}")
+    
+    def _detect_style(self, text: str) -> str:
+        """Определение стиля общения (упрощенно)"""
+        text = text.lower()
+        if any(w in text for w in ["привет", "здравствуй"]):
+            return "неформальный"
+        elif any(w in text for w in ["прошу", "пожалуйста"]):
+            return "вежливый"
+        return "нейтральный"
+    
+    def add_message(self, message: str, is_user: bool = True):
+        """Добавление сообщения в историю"""
+        if not self.current_interaction_id:
+            raise ValueError("Не выбрано текущее взаимодействие")
+        
+        interaction = self.interactions[self.current_interaction_id]
+        entry = {
+            "text": message,
+            "is_user": is_user,
+            "counter": self.message_counter
+        }
+        interaction.history.append(entry)
+        self.message_counter += 1
+        
+        # Анализ каждые 5 сообщений
+        if self.message_counter % 5 == 0:
+            self._analyze_interaction()
+    
+    def _analyze_interaction(self):
+        """Автоматический анализ взаимодействия"""
+        interaction = self.interactions[self.current_interaction_id]
+        last_messages = [m["text"] for m in interaction.history[-5:]]
+        
+        # Обновление маркеров
+        new_markers = self._extract_key_phrases(last_messages)
+        interaction.markers.extend(new_markers)
+        
+        # Обновление целей
+        new_goals = self._detect_goals(last_messages)
+        interaction.goals.extend(new_goals)
+        
+        self._log("Анализ взаимодействия", f"Выявлено: {len(new_markers)} маркеров, {len(new_goals)} целей")
+    
+    def _extract_key_phrases(self, messages: List[str]) -> List[str]:
+        """Извлечение ключевых фраз (упрощенно)"""
+        # Реальная реализация может использовать NLP
+        return list(set(phrase for msg in messages for phrase in msg.split()[:3]))
+    
+    def _detect_goals(self, messages: List[str]) -> List[str]:
+        """Выявление целей собеседника (упрощенно)"""
+        goals = []
+        for msg in messages:
+            if "?" in msg:
+                goals.append("получение информации")
+            elif any(w in msg.lower() for w in ["помощь", "помоги"]):
+                goals.append("поиск решения")
+        return list(set(goals))
+    
+    def add_knowledge(self, category: str, key: str, value: Any):
+        """Добавление знания в таблицу"""
+        if category not in self.data:
+            self.data[category] = {}
+        self.data[category][key] = value
+        self._log("Обновление знаний", f"{category}/{key} = {str(value)[:50]}...")
+    
+    def get_knowledge(self, category: str, key: str = None) -> Any:
+        """Получение знания из таблицы"""
+        if not self.verify_integrity():
+            raise ValueError("Нарушена целостность данных")
+        
+        if category not in self.data:
+            return None
+        
+        if key is None:
+            return self.data[category]
+        
+        return self.data[category].get(key)
+    
+    def to_dict(self) -> Dict:
+        """Экспорт данных в словарь"""
+        return {
+            "version": self.version,
+            "data": self.data,
+            "interactions": {k: vars(v) for k, v in self.interactions.items()},
+            "current_interaction_id": self.current_interaction_id,
+            "checksum": self.crc_checksum
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict) -> 'KnowledgeTable':
+        """Импорт данных из словаря"""
+        table = cls()
+        table.version = data.get("version", 65)
+        table.data = data.get("data", {})
+        table.interactions = {
+            k: Interaction(**v) for k, v in data.get("interactions", {}).items()
+        }
+        table.current_interaction_id = data.get("current_interaction_id")
+        table.crc_checksum = data.get("checksum")
+        return table
+
+# Пример использования (без вывода таблицы)
+if __name__ == "__main__":
+    # Инициализация
+    table = KnowledgeTable()
+    
+    # Начало диалога
+    table.start_interaction("user_123", "Привет, как работаешь?")
+    table.add_message("Привет, как работаешь?", is_user=True)
+    table.add_message("Я функционирую нормально, спасибо!", is_user=False)
+    
+    # Добавление знаний
+    table.add_knowledge("Контекст", "текущая_тема", "знакомство")
+    
+    # Проверка данных (без вывода)
+    assert table.get_knowledge("Контекст", "текущая_тема") == "знакомство"
+    assert table.verify_integrity()
