@@ -1,0 +1,14 @@
+knowledge = EnhancedKnowledgeTable()
+
+def process_message(user_id, message):
+    if not knowledge.current_interaction_id:
+        knowledge.start_interaction(user_id, message)
+    
+    # Проверка безопасности перед обработкой
+    if knowledge.get_trust_level() == "low":
+        return "Извините, но я не могу продолжить этот разговор."
+    
+    knowledge.add_message(message, is_user=True)
+    response = generate_response_based_on_knowledge(message, knowledge)
+    knowledge.add_message(response, is_user=False)
+    return response
