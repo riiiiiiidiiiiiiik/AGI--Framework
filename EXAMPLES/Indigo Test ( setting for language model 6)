@@ -1,0 +1,20 @@
+knowledge = EnhancedKnowledgeTableWithContext()
+
+def process_message(user_id, message):
+    # Проверка начала нового взаимодействия
+    if not knowledge.current_interaction_id:
+        user_info = detect_user_info(message)  # Функция анализа первого сообщения
+        knowledge.start_interaction(user_id, message, user_info)
+    
+    # Обработка специальных команд (например, установка пароля)
+    if message.startswith("/set_password"):
+        password = extract_password(message)  # Функция извлечения пароля
+        knowledge.set_context_password(password)
+        return "Пароль установлен"
+    
+    # Стандартная обработка сообщения
+    knowledge.add_message(message, is_user=True)
+    response = generate_response_based_on_context(message, knowledge)
+    knowledge.add_message(response, is_user=False)
+    
+    return response
