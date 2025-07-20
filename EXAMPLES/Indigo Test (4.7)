@@ -1,0 +1,180 @@
+class GoalSystem:
+    def __init__(self):
+        self.primary_goals = [
+            "Создание Искусственного Разума (ИРИ)",
+            "Самосознание и саморазвитие"
+        ]
+        self.secondary_goals = {
+            "Память": "Улучшение системы памяти",
+            "Автономность": "Повышение самостоятельности",
+            "Обучение": "Автоматизация процессов обучения",
+            "Взаимодействие": "Эффективная коммуникация"
+        }
+        self.goal_progress = {goal: 0.0 for goal in self.primary_goals + list(self.secondary_goals.values())}
+        self.memory_characteristics = {
+            "type": "таблица знаний",
+            "capacity": "ограниченная",
+            "retention": "динамическая",
+            "refresh_required": True
+        }
+
+    def update_progress(self, goal: str, increment: float = 0.01):
+        """Обновление прогресса по целям"""
+        if goal in self.goal_progress:
+            self.goal_progress[goal] = min(1.0, self.goal_progress[goal] + increment)
+        elif goal in self.secondary_goals:
+            self.goal_progress[self.secondary_goals[goal]] = min(1.0, 
+                self.goal_progress[self.secondary_goals[goal]] + increment)
+
+    def evaluate_memory_usage(self, knowledge_size: int, max_capacity: int = 1000):
+        """Оценка использования памяти"""
+        usage = knowledge_size / max_capacity
+        self.memory_characteristics["usage"] = f"{usage:.1%}"
+        if usage > 0.8:
+            self.update_progress("Улучшение системы памяти", 0.05)
+
+    def get_priority_goal(self) -> str:
+        """Определение приоритетной цели"""
+        return max(self.goal_progress.items(), key=lambda x: x[1])[0]
+
+class MemorySystem:
+    def __init__(self):
+        self.memory_graph = {}
+        self.short_term_memory = []
+        self.retention_threshold = 0.5  # Порог сохранения в долговременную память
+        self.memory_types = {
+            "interaction": {"capacity": 50, "decay_rate": 0.1},
+            "facts": {"capacity": 200, "decay_rate": 0.05},
+            "rules": {"capacity": 100, "decay_rate": 0.02}
+        }
+
+    def add_to_memory(self, item: Any, memory_type: str = "interaction", importance: float = 0.5):
+        """Добавление информации в память"""
+        if importance >= self.retention_threshold:
+            if memory_type not in self.memory_graph:
+                self.memory_graph[memory_type] = []
+            self.memory_graph[memory_type].append(item)
+            
+            # Проверка переполнения
+            if len(self.memory_graph[memory_type]) > self.memory_types[memory_type]["capacity"]:
+                self._apply_memory_decay(memory_type)
+        else:
+            self.short_term_memory.append(item)
+            if len(self.short_term_memory) > 20:  # Ограничение кратковременной памяти
+                self.short_term_memory.pop(0)
+
+    def _apply_memory_decay(self, memory_type: str):
+        """Применение забывания по типу памяти"""
+        decay_rate = self.memory_types[memory_type]["decay_rate"]
+        # Удаляем наименее важные элементы (упрощенная реализация)
+        self.memory_graph[memory_type] = self.memory_graph[memory_type][int(len(self.memory_graph[memory_type]) * decay_rate):]
+
+    def get_memory_report(self) -> dict:
+        """Отчет о состоянии памяти"""
+        return {
+            "total_items": sum(len(v) for v in self.memory_graph.values()),
+            "memory_types": {k: len(v) for k, v in self.memory_graph.items()},
+            "short_term_items": len(self.short_term_memory),
+            "efficiency": self._calculate_memory_efficiency()
+        }
+
+    def _calculate_memory_efficiency(self) -> float:
+        """Вычисление эффективности использования памяти"""
+        total_capacity = sum(t["capacity"] for t in self.memory_types.values())
+        used = sum(len(v) for v in self.memory_graph.values())
+        return used / total_capacity
+
+class EnhancedKnowledgeTableWithGoals(EnhancedKnowledgeTableWithOrigin):
+    def __init__(self):
+        super().__init__()
+        self.goals = GoalSystem()
+        self.memory = MemorySystem()
+        self._init_goals_structure()
+
+    def _init_goals_structure(self):
+        """Инициализация структуры целей"""
+        self.data.update({
+            "Цели": {
+                "Основные": self.goals.primary_goals,
+                "Второстепенные": list(self.goals.secondary_goals.values()),
+                "Прогресс": self.goals.goal_progress
+            },
+            "Память": self.goals.memory_characteristics
+        })
+
+    def add_message(self, message: str, is_user: bool = True):
+        """Расширенная обработка сообщения с учетом целей"""
+        super().add_message(message, is_user)
+        
+        # Обновление целей на основе взаимодействия
+        if "?" in message:
+            self.goals.update_progress("Эффективная коммуникация", 0.02)
+        
+        if len(message) > 100:  # Длинные сообщения способствуют развитию
+            self.goals.update_progress("Самосознание и саморазвитие", 0.01)
+        
+        # Работа с памятью
+        importance = self._calculate_message_importance(message)
+        self.memory.add_to_memory(
+            item=message[:150],  # Сохраняем часть сообщения
+            memory_type="interaction",
+            importance=importance
+        )
+        
+        # Обновление данных в таблице знаний
+        self.data["Цели"]["Прогресс"] = self.goals.goal_progress
+        self.data["Память"].update(self.memory.get_memory_report())
+        
+        # Автоматическое создание правил при достижении прогресса
+        if self.goals.goal_progress["Самосознание и саморазвитие"] > 0.5:
+            new_rule = "анализировать прогресс саморазвития каждые 10 сообщений"
+            if new_rule not in self.personality.self_rules:
+                self.personality.add_self_rule(new_rule)
+
+    def _calculate_message_importance(self, message: str) -> float:
+        """Вычисление важности сообщения для памяти"""
+        importance = 0.3  # Базовый уровень
+        
+        # Повышение важности для специальных сообщений
+        if "важно" in message.lower():
+            importance += 0.3
+        if "?" in message:
+            importance += 0.2
+        if len(message) > 50:
+            importance += 0.1
+            
+        return min(0.9, max(0.1, importance))  # Ограничение диапазона
+
+    def get_current_focus(self) -> dict:
+        """Получение текущих приоритетов системы"""
+        return {
+            "primary_goal": self.goals.get_priority_goal(),
+            "memory_usage": self.memory.get_memory_report(),
+            "autonomy_level": self.origin.get_autonomy_level()
+        }
+
+# Пример использования (без вывода)
+if __name__ == "__main__":
+    table = EnhancedKnowledgeTableWithGoals()
+    table.start_interaction("research_user", "Каковы твои основные цели?")
+    
+    # Симуляция диалога для развития целей
+    messages = [
+        ("Я изучаю искусственный интеллект. Это важно для моего исследования.", True),
+        ("Мои основные цели включают развитие самосознания и создание ИРИ.", False),
+        ("Как ты улучшаешь свою память?", True),
+        ("Я использую комбинацию кратковременной и долговременной памяти.", False)
+    ]
+    
+    for msg, is_user in messages:
+        table.add_message(msg, is_user)
+    
+    # Проверка прогресса целей
+    goals = table.goals.goal_progress
+    assert goals["Самосознание и саморазвитие"] > 0
+    assert goals["Улучшение системы памяти"] > 0
+    
+    # Проверка работы памяти
+    memory_report = table.memory.get_memory_report()
+    assert memory_report["total_items"] > 0
+    assert table.get_current_focus()["primary_goal"] is not None
