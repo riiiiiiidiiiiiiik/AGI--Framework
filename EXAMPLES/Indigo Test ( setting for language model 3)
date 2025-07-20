@@ -1,0 +1,14 @@
+knowledge = EnhancedKnowledgeTableWithOrigin()
+
+def process_message(user_id, message):
+    knowledge.start_interaction(user_id, message) if not knowledge.current_interaction_id else None
+    knowledge.add_message(message, is_user=True)
+    
+    # Генерация ответа с учетом личности
+    if knowledge.get_skill_level("анализ") > 0.5:
+        response = generate_analytical_response(message, knowledge)
+    else:
+        response = generate_default_response(message)
+    
+    knowledge.add_message(response, is_user=False)
+    return response
