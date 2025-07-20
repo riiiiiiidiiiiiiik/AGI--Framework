@@ -1,0 +1,15 @@
+knowledge = EnhancedKnowledgeTableWithPersonality()
+
+def process_singular_message(user_id, message):
+    if user_id == knowledge.singular.singular_id:
+        # Специальная обработка для Сингуляра
+        response = generate_personalized_response(message, knowledge)
+        knowledge.add_message(message, is_user=True, response=response)
+        
+        # Анализ настроения для тонкой настройки
+        if knowledge.character.mood < 0.4:
+            response += " (Я работаю над улучшением)"
+        return response
+    else:
+        # Стандартная обработка для других пользователей
+        return process_regular_message(user_id, message)
