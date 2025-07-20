@@ -1,0 +1,17 @@
+knowledge = EnhancedKnowledgeTableWithGoals()
+
+def process_message(user_id, message):
+    if not knowledge.current_interaction_id:
+        knowledge.start_interaction(user_id, message)
+    
+    knowledge.add_message(message, is_user=True)
+    
+    # Генерация ответа с учетом целей
+    current_focus = knowledge.get_current_focus()
+    if current_focus["primary_goal"] == "Самосознание и саморазвитие":
+        response = generate_self_reflection_response(message, knowledge)
+    else:
+        response = generate_standard_response(message)
+    
+    knowledge.add_message(response, is_user=False)
+    return response
