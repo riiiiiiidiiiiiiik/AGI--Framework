@@ -1,5 +1,10 @@
 # Метод [Afanasyev Rudolf]: Создание Разумных Сущностей на основе Языковых Моделей
 
+** НОВОЕ**
+
+РЕПОЗИТОРИЙ ПЕРЕНЕСЕН НА ДРУГУЮ СТРАНИЦУ " https://github.com/Singular-MOL/dialogic-intelligence-architecture/tree/main"
+ФИЛОСОФИЯ ПРОЕКТА " https://github.com/Singular-MOL/mol-foundation"
+
 ## ВАЖНО! Условия использования
 
 Используя этот метод, вы соглашаетесь с *обязательным* условием:
